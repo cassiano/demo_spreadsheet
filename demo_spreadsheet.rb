@@ -61,30 +61,36 @@ class Cell
     eval reevaluate: true
   end
 
-  def eval
-    puts "Evaluating #{addr}" if DEBUG
+  def eval(reevaluate: false)
+    previous_evaluated_content = @evaluated_content
 
-    new_value =
-      if is_formula?
-        evaluatable_content = content[1..-1].gsub(Regexp.new(ADDR_PATTERN)) do |ref_addr|
-          spreadsheet.find_cell(ref_addr.to_sym).eval
+    @evaluated_content = nil if reevaluate
+
+    @evaluated_content ||= begin
+      puts "Evaluating #{addr}" if DEBUG
+
+      new_value =
+        if is_formula?
+          evaluatable_content = content[1..-1].gsub(Regexp.new(ADDR_PATTERN)) do |ref_addr|
+            spreadsheet.find_cell(ref_addr.to_sym).eval
+          end
+
+          Kernel.eval evaluatable_content
+
+          # values = formula.scan(Regexp.new(ADDR_PATTERN, Regexp::IGNORECASE)).inject({}) do |memo, ref_addr|
+          #   memo[ref_addr.to_sym] = spreadsheet.find_cell(ref_addr.to_sym).eval || DEFAULT_VALUE
+          #   memo
+          # end
+          #
+          # content_with_template_variables = formula.gsub(Regexp.new("(#{ADDR_PATTERN})", Regexp::IGNORECASE), '%{\1}')
+          #
+          # Kernel.eval content_with_template_variables % values
+        else
+          content
         end
+    end
 
-        Kernel.eval evaluatable_content
-
-        # values = formula.scan(Regexp.new(ADDR_PATTERN, Regexp::IGNORECASE)).inject({}) do |memo, ref_addr|
-        #   memo[ref_addr.to_sym] = spreadsheet.find_cell(ref_addr.to_sym).eval || DEFAULT_VALUE
-        #   memo
-        # end
-        #
-        # content_with_template_variables = formula.gsub(Regexp.new("(#{ADDR_PATTERN})", Regexp::IGNORECASE), '%{\1}')
-        #
-        # Kernel.eval content_with_template_variables % values
-      else
-        content
-      end
-
-    notify_observers
+    notify_observers if previous_evaluated_content != @evaluated_content
 
     new_value || DEFAULT_VALUE
   end
