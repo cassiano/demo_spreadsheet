@@ -38,7 +38,7 @@ describe Spreadsheet do
     a5.eval.must_equal a4_value * 2
   end
 
-  it 'allows cells to propagate their changes to other cells' do
+  it 'allows cells to propagate their changes to other cells (in  a chain)' do
     a1 = @spreadsheet.set_cell(:A1, 1)
     a2 = @spreadsheet.set_cell(:A2, 2)
     a3 = @spreadsheet.set_cell(:A3)
@@ -98,6 +98,14 @@ describe Spreadsheet do
 
       a3.references.must_be_empty
       a3.observers.must_be_empty
+    end
+  end
+
+  describe "Cyclical references" do
+    it "checks for auto references" do
+      must_raise do
+        @spreadsheet.set_cell :A1, '=A1+A2+A3'
+      end
     end
   end
 end

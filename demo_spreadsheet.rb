@@ -1,6 +1,12 @@
 # require 'pp'
 
-DEBUG = true
+class Object
+  DEBUG = true
+
+  def log(msg)
+    puts "[#{Time.now}] #{msg}" if DEBUG
+  end
+end
 
 class Spreadsheet
   attr_reader :cells
@@ -38,7 +44,7 @@ class Cell
   end
 
   def content=(new_content)
-    puts "Changing #{addr} from `#{content}` to `#{new_content}`"
+    log "Changing #{addr} from `#{content}` to `#{new_content}`"
 
     @content = new_content
 
@@ -67,32 +73,31 @@ class Cell
     @evaluated_content = nil if reevaluate
 
     @evaluated_content ||= begin
-      puts "Evaluating #{addr}" if DEBUG
+      log "Evaluating #{addr} (reevaluate: #{reevaluate})"
 
-      new_value =
-        if is_formula?
-          evaluatable_content = content[1..-1].gsub(Regexp.new(ADDR_PATTERN)) do |ref_addr|
-            spreadsheet.find_cell(ref_addr.to_sym).eval
-          end
-
-          Kernel.eval evaluatable_content
-
-          # values = formula.scan(Regexp.new(ADDR_PATTERN, Regexp::IGNORECASE)).inject({}) do |memo, ref_addr|
-          #   memo[ref_addr.to_sym] = spreadsheet.find_cell(ref_addr.to_sym).eval || DEFAULT_VALUE
-          #   memo
-          # end
-          #
-          # content_with_template_variables = formula.gsub(Regexp.new("(#{ADDR_PATTERN})", Regexp::IGNORECASE), '%{\1}')
-          #
-          # Kernel.eval content_with_template_variables % values
-        else
-          content
+      if is_formula?
+        evaluatable_content = content[1..-1].gsub(Regexp.new(ADDR_PATTERN)) do |ref_addr|
+          spreadsheet.find_cell(ref_addr.to_sym).eval
         end
+
+        Kernel.eval evaluatable_content
+
+        # values = formula.scan(Regexp.new(ADDR_PATTERN, Regexp::IGNORECASE)).inject({}) do |memo, ref_addr|
+        #   memo[ref_addr.to_sym] = spreadsheet.find_cell(ref_addr.to_sym).eval || DEFAULT_VALUE
+        #   memo
+        # end
+        #
+        # content_with_template_variables = formula.gsub(Regexp.new("(#{ADDR_PATTERN})", Regexp::IGNORECASE), '%{\1}')
+        #
+        # Kernel.eval content_with_template_variables % values
+      else
+        content
+      end
     end
 
-    notify_observers if previous_evaluated_content != @evaluated_content
+    notify_observers if previous_evaluated_content.to_s != @evaluated_content.to_s
 
-    new_value || DEFAULT_VALUE
+    @evaluated_content || DEFAULT_VALUE
   end
 
   protected
@@ -108,7 +113,7 @@ class Cell
   def add_reference(reference)
     raise "Cyclical reference detected when adding #{reference.addr} to #{addr}" if reference.directly_or_indirectly_references?(self)
 
-    puts "Adding reference #{reference.addr} to #{addr}" if DEBUG
+    log "Adding reference #{reference.addr} to #{addr}"
 
     references << reference
 
@@ -116,7 +121,7 @@ class Cell
   end
 
   def remove_reference(reference)
-    puts "Removing reference #{reference.addr} from #{addr}" if DEBUG
+    log "Removing reference #{reference.addr} from #{addr}"
 
     references.delete reference
 
@@ -124,13 +129,13 @@ class Cell
   end
 
   def add_observer(observer)
-    puts "Adding observer #{observer.addr} to #{addr}" if DEBUG
+    log "Adding observer #{observer.addr} to #{addr}"
 
     observers << observer
   end
 
   def remove_observer(observer)
-    puts "Removing observer #{observer.addr} from #{addr}" if DEBUG
+    log "Removing observer #{observer.addr} from #{addr}"
 
     observers.delete observer
   end
@@ -142,7 +147,7 @@ class Cell
   end
 
   def notify_observers
-    puts "Notifying #{addr}'s observers #{observers.map(&:addr).inspect}" if DEBUG
+    log "Notifying #{addr}'s observers #{observers.map(&:addr).inspect}"
 
     observers.each do |observer|
       observer.eval reevaluate: true
