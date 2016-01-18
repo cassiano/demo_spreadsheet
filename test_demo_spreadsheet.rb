@@ -60,9 +60,9 @@ describe Spreadsheet do
     it 'keeps these 2 collections for all cells' do
       a4 = @spreadsheet.set(:A4, '=A1+A2+A3')
 
-      a1 = @spreadsheet.set(:A1)
-      a2 = @spreadsheet.set(:A2)
-      a3 = @spreadsheet.set(:A3)
+      a1 = @spreadsheet.find(:A1)
+      a2 = @spreadsheet.find(:A2)
+      a3 = @spreadsheet.find(:A3)
 
       a4.references.size.must_equal 3
       Set.new(a4.references).must_equal Set.new([a1, a2, a3])
@@ -83,9 +83,9 @@ describe Spreadsheet do
 
       a4.content = '=1+1'
 
-      a1 = @spreadsheet.set(:A1)
-      a2 = @spreadsheet.set(:A2)
-      a3 = @spreadsheet.set(:A3)
+      a1 = @spreadsheet.find(:A1)
+      a2 = @spreadsheet.find(:A2)
+      a3 = @spreadsheet.find(:A3)
 
       a4.references.must_be_empty
       a4.observers.must_be_empty

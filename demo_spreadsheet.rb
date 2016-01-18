@@ -15,6 +15,10 @@ class Spreadsheet
     @cells = {}
   end
 
+  def find(addr)
+    cells[addr] || set(addr)
+  end
+
   def set(addr, content = nil)
     if (cell = cells[addr])
       cell.tap { |c| c.content = content if content }
