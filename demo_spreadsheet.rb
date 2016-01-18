@@ -1,7 +1,7 @@
 # require 'pp'
 
 class Object
-  DEBUG = true
+  DEBUG = false
 
   def log(msg)
     puts "[#{Time.now}] #{msg}" if DEBUG
@@ -15,16 +15,26 @@ class Spreadsheet
     @cells = {}
   end
 
-  def set_cell(addr, content = nil)
-    cells[addr] = Cell.new(self, addr, content)
-  end
-
-  def find_cell(addr)
-    cells[addr] || set_cell(addr)
+  def set(addr, content = nil)
+    if (cell = cells[addr])
+      cell.tap { |c| c.content = content if content }
+    else
+      add_cell addr, content
+    end
   end
 
   def consistent?
     true
+  end
+
+  private
+
+  def add_cell(addr, content = nil)
+    cell         = Cell.new(self, addr)
+    cells[addr]  = cell
+    cell.content = content if content
+
+    cell
   end
 end
 
@@ -34,13 +44,14 @@ class Cell
 
   attr_reader :spreadsheet, :addr, :content, :references, :observers
 
-  def initialize(spreadsheet, addr, content)
+  # List of possible exceptions.
+  class CircularReferenceError < StandardError; end
+
+  def initialize(spreadsheet, addr)
     @spreadsheet = spreadsheet
     @addr        = addr
     @references  = []
     @observers   = []
-
-    self.content = content
   end
 
   def content=(new_content)
@@ -54,20 +65,20 @@ class Cell
       # First implementation could be something like:
       #
       # @references = new_content.scan(Regexp.new(ADDR_PATTERN)).map do |ref_addr|
-      #   spreadsheet.find_cell ref_addr.to_sym
+      #   spreadsheet.set ref_addr.to_sym
       # end
       #
       # But would we update the observers list???
 
       new_content.scan(Regexp.new(ADDR_PATTERN, Regexp::IGNORECASE)).map do |ref_addr|
-        add_reference spreadsheet.find_cell(ref_addr.to_sym)
+        add_reference spreadsheet.set(ref_addr.to_sym)
       end
     end
 
-    eval reevaluate: true
+    eval true
   end
 
-  def eval(reevaluate: false)
+  def eval(reevaluate = false)
     previous_evaluated_content = @evaluated_content
 
     @evaluated_content = nil if reevaluate
@@ -77,13 +88,13 @@ class Cell
 
       if is_formula?
         evaluatable_content = content[1..-1].gsub(Regexp.new(ADDR_PATTERN)) do |ref_addr|
-          spreadsheet.find_cell(ref_addr.to_sym).eval
+          spreadsheet.set(ref_addr.to_sym).eval
         end
 
         Kernel.eval evaluatable_content
 
         # values = formula.scan(Regexp.new(ADDR_PATTERN, Regexp::IGNORECASE)).inject({}) do |memo, ref_addr|
-        #   memo[ref_addr.to_sym] = spreadsheet.find_cell(ref_addr.to_sym).eval || DEFAULT_VALUE
+        #   memo[ref_addr.to_sym] = spreadsheet.set(ref_addr.to_sym).eval || DEFAULT_VALUE
         #   memo
         # end
         #
@@ -111,9 +122,11 @@ class Cell
   end
 
   def add_reference(reference)
-    raise "Cyclical reference detected when adding #{reference.addr} to #{addr}" if reference.directly_or_indirectly_references?(self)
-
     log "Adding reference #{reference.addr} to #{addr}"
+
+    if reference.directly_or_indirectly_references?(self)
+      raise CircularReferenceError, "Circular reference detected when adding #{reference.addr} to #{addr}"
+    end
 
     references << reference
 
@@ -150,12 +163,16 @@ class Cell
     log "Notifying #{addr}'s observers #{observers.map(&:addr).inspect}"
 
     observers.each do |observer|
-      observer.eval reevaluate: true
+      observer.eval true
     end
   end
 
   def directly_or_indirectly_references?(cell)
-    self == cell || references.any? { |reference| reference.directly_or_indirectly_references?(cell) }
+    log "Checking if #{addr} directly or indirectly references #{cell.addr}"
+
+    self == cell || references.any? do |reference|
+      reference.directly_or_indirectly_references? cell
+    end
   end
 
   def inspect
@@ -166,11 +183,11 @@ end
 def run!
   s = Spreadsheet.new
 
-  a1 = s.set_cell(:A1, 1)
-  a2 = s.set_cell(:A2, 2)
-  a3 = s.set_cell(:A3)
-  a4 = s.set_cell(:A4, '=A1+A2+A3')
-  a5 = s.set_cell(:A5, '=A4*2')
+  a1 = s.set(:A1, 1)
+  a2 = s.set(:A2, 2)
+  a3 = s.set(:A3)
+  a4 = s.set(:A4, '=A1+A2+A3')
+  a5 = s.set(:A5, '=A4*2')
   # a1.content = '=A5'
 
   puts 'Initial spreadsheet:'

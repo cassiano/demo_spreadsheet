@@ -18,9 +18,9 @@ describe Spreadsheet do
   end
 
   it 'allows cells to contain scalar values' do
-    a1 = @spreadsheet.set_cell(:A1, 1)
-    a2 = @spreadsheet.set_cell(:A2, 2)
-    a3 = @spreadsheet.set_cell(:A3)
+    a1 = @spreadsheet.set(:A1, 1)
+    a2 = @spreadsheet.set(:A2, 2)
+    a3 = @spreadsheet.set(:A3)
 
     a1.eval.must_equal 1
     a2.eval.must_equal 2
@@ -28,22 +28,22 @@ describe Spreadsheet do
   end
 
   it 'allows cells to also contain formulas' do
-    a1 = @spreadsheet.set_cell(:A1, 1)
-    a2 = @spreadsheet.set_cell(:A2, 2)
-    a3 = @spreadsheet.set_cell(:A3)
-    a4 = @spreadsheet.set_cell(:A4, '=A1+A2+A3')
-    a5 = @spreadsheet.set_cell(:A5, '=A4*2')
+    a1 = @spreadsheet.set(:A1, 1)
+    a2 = @spreadsheet.set(:A2, 2)
+    a3 = @spreadsheet.set(:A3)
+    a4 = @spreadsheet.set(:A4, '=A1+A2+A3')
+    a5 = @spreadsheet.set(:A5, '=A4*2')
 
     a4.eval.must_equal (a4_value = 1 + 2 + Cell::DEFAULT_VALUE)
     a5.eval.must_equal a4_value * 2
   end
 
   it 'allows cells to propagate their changes to other cells (in  a chain)' do
-    a1 = @spreadsheet.set_cell(:A1, 1)
-    a2 = @spreadsheet.set_cell(:A2, 2)
-    a3 = @spreadsheet.set_cell(:A3)
-    a4 = @spreadsheet.set_cell(:A4, '=A1+A2+A3')
-    a5 = @spreadsheet.set_cell(:A5, '=A4*2')
+    a1 = @spreadsheet.set(:A1, 1)
+    a2 = @spreadsheet.set(:A2, 2)
+    a3 = @spreadsheet.set(:A3)
+    a4 = @spreadsheet.set(:A4, '=A1+A2+A3')
+    a5 = @spreadsheet.set(:A5, '=A4*2')
 
     a1.content = 10
 
@@ -58,11 +58,11 @@ describe Spreadsheet do
 
   describe 'cell references and observers' do
     it 'keeps these 2 collections for all cells' do
-      a4 = @spreadsheet.set_cell(:A4, '=A1+A2+A3')
+      a4 = @spreadsheet.set(:A4, '=A1+A2+A3')
 
-      a1 = @spreadsheet.find_cell(:A1)
-      a2 = @spreadsheet.find_cell(:A2)
-      a3 = @spreadsheet.find_cell(:A3)
+      a1 = @spreadsheet.set(:A1)
+      a2 = @spreadsheet.set(:A2)
+      a3 = @spreadsheet.set(:A3)
 
       a4.references.size.must_equal 3
       Set.new(a4.references).must_equal Set.new([a1, a2, a3])
@@ -79,13 +79,13 @@ describe Spreadsheet do
     end
 
     it 'keeps these collections always in sync' do
-      a4 = @spreadsheet.set_cell(:A4, '=A1+A2+A3')
+      a4 = @spreadsheet.set(:A4, '=A1+A2+A3')
 
       a4.content = '=1+1'
 
-      a1 = @spreadsheet.find_cell(:A1)
-      a2 = @spreadsheet.find_cell(:A2)
-      a3 = @spreadsheet.find_cell(:A3)
+      a1 = @spreadsheet.set(:A1)
+      a2 = @spreadsheet.set(:A2)
+      a3 = @spreadsheet.set(:A3)
 
       a4.references.must_be_empty
       a4.observers.must_be_empty
@@ -103,8 +103,16 @@ describe Spreadsheet do
 
   describe "Cyclical references" do
     it "checks for auto references" do
-      must_raise do
-        @spreadsheet.set_cell :A1, '=A1+A2+A3'
+      assert_raises Cell::CircularReferenceError do
+        @spreadsheet.set :A1, '=A1+1'
+      end
+    end
+
+    it "checks for indirect references" do
+      assert_raises Cell::CircularReferenceError do
+        a1 = @spreadsheet.set(:A1, '=A2')
+        a2 = @spreadsheet.set(:A2, '=A3')
+        a3 = @spreadsheet.set(:A3, '=A1')
       end
     end
   end
