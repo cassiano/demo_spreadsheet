@@ -1,5 +1,7 @@
 # require 'pp'
 
+require 'set'
+
 class Object
   DEBUG = false
 
@@ -15,11 +17,13 @@ class Spreadsheet
     @cells = {}
   end
 
-  def find(addr)
-    cells[addr] || set(addr)
+  def get(addr)
+    set addr
   end
 
   def set(addr, content = nil)
+    addr = addr.to_sym
+
     if (cell = cells[addr])
       cell.tap { |c| c.content = content if content }
     else
@@ -43,8 +47,8 @@ class Spreadsheet
 end
 
 class Cell
-  DEFAULT_VALUE = 0
-  ADDR_PATTERN  = '[A-Z]+[1-9]\d*'
+  DEFAULT_VALUE   = 0
+  ADDR_PATTERN_RE = /[A-Z]+[1-9]\d*/i
 
   attr_reader :spreadsheet, :addr, :content, :references, :observers
 
@@ -54,28 +58,22 @@ class Cell
   def initialize(spreadsheet, addr)
     @spreadsheet = spreadsheet
     @addr        = addr
-    @references  = []
-    @observers   = []
+    @references  = Set.new
+    @observers   = Set.new
   end
 
   def content=(new_content)
     log "Changing #{addr} from `#{content}` to `#{new_content}`"
 
+    return if new_content.to_s == content.to_s
+
     @content = new_content
 
     reset_references
 
-    if is_formula?(new_content)
-      # First implementation could be something like:
-      #
-      # @references = new_content.scan(Regexp.new(ADDR_PATTERN)).map do |ref_addr|
-      #   spreadsheet.set ref_addr.to_sym
-      # end
-      #
-      # But would we update the observers list???
-
-      new_content.scan(Regexp.new(ADDR_PATTERN, Regexp::IGNORECASE)).map do |ref_addr|
-        add_reference spreadsheet.set(ref_addr.to_sym)
+    if is_formula?
+      formula.scan(ADDR_PATTERN_RE).uniq.map do |ref_addr|
+        add_reference spreadsheet.get(ref_addr)
       end
     end
 
@@ -91,13 +89,13 @@ class Cell
       log "Evaluating #{addr} (reevaluate: #{reevaluate})"
 
       if is_formula?
-        evaluatable_content = content[1..-1].gsub(Regexp.new(ADDR_PATTERN)) do |ref_addr|
-          spreadsheet.set(ref_addr.to_sym).eval
+        evaluatable_content = formula.gsub(ADDR_PATTERN_RE) do |ref_addr|
+          spreadsheet.get(ref_addr).eval
         end
 
         Kernel.eval evaluatable_content
 
-        # values = formula.scan(Regexp.new(ADDR_PATTERN, Regexp::IGNORECASE)).inject({}) do |memo, ref_addr|
+        # values = formula.scan(ADDR_PATTERN_RE).inject({}) do |memo, ref_addr|
         #   memo[ref_addr.to_sym] = spreadsheet.set(ref_addr.to_sym).eval || DEFAULT_VALUE
         #   memo
         # end
@@ -117,8 +115,8 @@ class Cell
 
   protected
 
-  def is_formula?(any_content = content)
-    any_content.is_a?(String) && any_content.start_with?('=')
+  def is_formula?
+    content.is_a?(String) && content.start_with?('=')
   end
 
   def formula
@@ -184,38 +182,38 @@ class Cell
   end
 end
 
-def run!
-  s = Spreadsheet.new
-
-  a1 = s.set(:A1, 1)
-  a2 = s.set(:A2, 2)
-  a3 = s.set(:A3)
-  a4 = s.set(:A4, '=A1+A2+A3')
-  a5 = s.set(:A5, '=A4*2')
-  # a1.content = '=A5'
-
-  puts 'Initial spreadsheet:'
-  p s
-  p [a1, a2, a3, a4, a5].map { |cell| [cell.content, cell.eval] }
-
-  puts 'Setting A1 to 10:'
-  a1.content = 10
-  p [a1, a2, a3, a4, a5].map { |cell| [cell.content, cell.eval] }
-
-  puts 'Setting A2 to 20:'
-  a2.content = 20
-  p [a1, a2, a3, a4, a5].map { |cell| [cell.content, cell.eval] }
-
-  puts 'Setting A3 to 30:'
-  a3.content = 30
-  p [a1, a2, a3, a4, a5].map { |cell| [cell.content, cell.eval] }
-
-  puts 'Setting A4 to "=1+1":'
-  a4.content = '=1+1'
-  p [a1, a2, a3, a4, a5].map { |cell| [cell.content, cell.eval] }
-
-  puts 'Final spreadsheet:'
-  p s
-end
-
-run! if __FILE__ == $0
+# def run!
+#   s = Spreadsheet.new
+#
+#   a1 = s.set(:A1, 1)
+#   a2 = s.set(:A2, 2)
+#   a3 = s.set(:A3)
+#   a4 = s.set(:A4, '=A1+A2+A3')
+#   a5 = s.set(:A5, '=A4*2')
+#   # a1.content = '=A5'
+#
+#   puts 'Initial spreadsheet:'
+#   p s
+#   p [a1, a2, a3, a4, a5].map { |cell| [cell.content, cell.eval] }
+#
+#   puts 'Setting A1 to 10:'
+#   a1.content = 10
+#   p [a1, a2, a3, a4, a5].map { |cell| [cell.content, cell.eval] }
+#
+#   puts 'Setting A2 to 20:'
+#   a2.content = 20
+#   p [a1, a2, a3, a4, a5].map { |cell| [cell.content, cell.eval] }
+#
+#   puts 'Setting A3 to 30:'
+#   a3.content = 30
+#   p [a1, a2, a3, a4, a5].map { |cell| [cell.content, cell.eval] }
+#
+#   puts 'Setting A4 to "=1+1":'
+#   a4.content = '=1+1'
+#   p [a1, a2, a3, a4, a5].map { |cell| [cell.content, cell.eval] }
+#
+#   puts 'Final spreadsheet:'
+#   p s
+# end
+#
+# run! if __FILE__ == $0

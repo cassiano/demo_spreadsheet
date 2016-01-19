@@ -60,22 +60,22 @@ describe Spreadsheet do
     it 'keeps these 2 collections for all cells' do
       a4 = @spreadsheet.set(:A4, '=A1+A2+A3')
 
-      a1 = @spreadsheet.find(:A1)
-      a2 = @spreadsheet.find(:A2)
-      a3 = @spreadsheet.find(:A3)
+      a1 = @spreadsheet.get(:A1)
+      a2 = @spreadsheet.get(:A2)
+      a3 = @spreadsheet.get(:A3)
 
       a4.references.size.must_equal 3
-      Set.new(a4.references).must_equal Set.new([a1, a2, a3])
+      a4.references.must_equal Set.new([a1, a2, a3])
       a4.observers.must_be_empty
 
       a1.references.must_be_empty
-      a1.observers.must_equal [a4]
+      a1.observers.must_equal Set.new([a4])
 
       a2.references.must_be_empty
-      a2.observers.must_equal [a4]
+      a2.observers.must_equal Set.new([a4])
 
       a3.references.must_be_empty
-      a3.observers.must_equal [a4]
+      a3.observers.must_equal Set.new([a4])
     end
 
     it 'keeps these collections always in sync' do
@@ -83,9 +83,9 @@ describe Spreadsheet do
 
       a4.content = '=1+1'
 
-      a1 = @spreadsheet.find(:A1)
-      a2 = @spreadsheet.find(:A2)
-      a3 = @spreadsheet.find(:A3)
+      a1 = @spreadsheet.get(:A1)
+      a2 = @spreadsheet.get(:A2)
+      a3 = @spreadsheet.get(:A3)
 
       a4.references.must_be_empty
       a4.observers.must_be_empty
@@ -101,8 +101,8 @@ describe Spreadsheet do
     end
   end
 
-  describe "Cyclical references" do
-    it "checks for auto references" do
+  describe "cyclical references" do
+    it "checks for direct (auto) references" do
       assert_raises Cell::CircularReferenceError do
         @spreadsheet.set :A1, '=A1+1'
       end
