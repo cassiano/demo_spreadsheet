@@ -3,7 +3,7 @@
 require 'set'
 
 class Object
-  DEBUG = true
+  DEBUG = false
 
   def log(msg)
     puts "[#{Time.now}] #{msg}" if DEBUG
@@ -75,7 +75,7 @@ class Cell
 
     @content = new_content
 
-    sync_references find_references
+    sync_references
 
     eval true
   end
@@ -163,9 +163,11 @@ class Cell
     end
   end
 
-  def sync_references(new_references)
-    references_to_remove = references - Set.new(new_references)
-    references_to_add    = Set.new(new_references) - references
+  def sync_references
+    current_references =  Set.new(find_references)
+
+    references_to_remove = references - current_references
+    references_to_add    = current_references - references
 
     references_to_remove.each { |reference| remove_reference reference }
     references_to_add.each { |reference| add_reference reference }
