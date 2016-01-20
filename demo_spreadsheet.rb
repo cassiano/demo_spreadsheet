@@ -3,7 +3,7 @@
 require 'set'
 
 class Object
-  DEBUG = false
+  DEBUG = true
 
   def log(msg)
     puts "[#{Time.now}] #{msg}" if DEBUG
@@ -17,7 +17,13 @@ class Spreadsheet
     @cells = {}
   end
 
+  def cell_count
+    cells.count
+  end
+
   def get(addr)
+    addr = addr.to_sym
+
     set addr
   end
 
@@ -69,13 +75,7 @@ class Cell
 
     @content = new_content
 
-    reset_references
-
-    if is_formula?
-      formula.scan(ADDR_PATTERN_RE).uniq.map do |ref_addr|
-        add_reference spreadsheet.get(ref_addr)
-      end
-    end
+    sync_references find_references
 
     eval true
   end
@@ -155,10 +155,20 @@ class Cell
     observers.delete observer
   end
 
-  def reset_references
-    references.clone.each do |reference|
-      remove_reference reference
+  def find_references
+    if is_formula?
+      formula.scan(ADDR_PATTERN_RE).uniq.map { |ref_addr| spreadsheet.get ref_addr }
+    else
+      []
     end
+  end
+
+  def sync_references(new_references)
+    references_to_remove = references - Set.new(new_references)
+    references_to_add    = Set.new(new_references) - references
+
+    references_to_remove.each { |reference| remove_reference reference }
+    references_to_add.each { |reference| add_reference reference }
   end
 
   def notify_observers

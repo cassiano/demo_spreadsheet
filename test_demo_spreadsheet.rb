@@ -14,7 +14,7 @@ describe Spreadsheet do
   end
 
   it 'will be empty when created' do
-    @spreadsheet.cells.must_equal Hash.new
+    @spreadsheet.cell_count.must_equal 0
   end
 
   it 'allows cells to contain scalar values' do
@@ -79,41 +79,43 @@ describe Spreadsheet do
     end
 
     it 'keeps these collections always in sync' do
-      a4 = @spreadsheet.set(:A4, '=A1+A2+A3')
+      a5 = @spreadsheet.set(:A5, '=A1+A2+A3')
 
-      a4.content = '=1+1'
+      a5.content = '=A2+A4'
 
       a1 = @spreadsheet.get(:A1)
       a2 = @spreadsheet.get(:A2)
       a3 = @spreadsheet.get(:A3)
+      a4 = @spreadsheet.get(:A4)
 
-      a4.references.must_be_empty
-      a4.observers.must_be_empty
+      a5.references.must_equal Set.new([a2, a4])
+      a5.observers.must_be_empty
 
       a1.references.must_be_empty
       a1.observers.must_be_empty
 
       a2.references.must_be_empty
-      a2.observers.must_be_empty
+      a2.observers.must_equal Set.new([a5])
 
       a3.references.must_be_empty
       a3.observers.must_be_empty
+
+      a4.references.must_be_empty
+      a2.observers.must_equal Set.new([a5])
     end
   end
 
   describe "cyclical references" do
     it "checks for direct (auto) references" do
-      assert_raises Cell::CircularReferenceError do
-        @spreadsheet.set :A1, '=A1+1'
-      end
+      -> { @spreadsheet.set(:A1, '=A1+1') }.must_raise Cell::CircularReferenceError
     end
 
     it "checks for indirect references" do
-      assert_raises Cell::CircularReferenceError do
+      -> {
         a1 = @spreadsheet.set(:A1, '=A2')
         a2 = @spreadsheet.set(:A2, '=A3')
         a3 = @spreadsheet.set(:A3, '=A1')
-      end
+      }.must_raise Cell::CircularReferenceError
     end
   end
 end
