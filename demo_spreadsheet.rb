@@ -181,12 +181,53 @@ class Cell
     end
   end
 
+  # Recursive version.
+  # def directly_or_indirectly_references?(cell)
+  #   log "Checking if #{addr} directly or indirectly references #{cell.addr}"
+  #
+  #   self == cell || references.any? do |reference|
+  #     reference.directly_or_indirectly_references? cell
+  #   end
+  # end
+
+  # Non-recursive version.
   def directly_or_indirectly_references?(cell)
     log "Checking if #{addr} directly or indirectly references #{cell.addr}"
 
-    self == cell || references.any? do |reference|
-      reference.directly_or_indirectly_references? cell
+    references_visitor do |reference|
+      return true if reference == cell
     end
+
+    false
+  end
+
+  def references_visitor
+    return enum_for(:references_visitor) unless block_given?
+
+    index       = 0
+    visited     = {}
+    visit_queue = []
+
+    # Start scheduling a visit for the node pointed to by 'self'.
+    visit_queue << self
+
+    # Repeat while there are still nodes to be visited.
+    while !visit_queue.empty? do
+      current = visit_queue.shift     # Retrieve the oldest key.
+
+      # Visit the node and save the result.
+      visited[current] = yield(current, index)
+
+      # Schedule a visit for each of the current node's references.
+      current.references.each do |reference|
+        # But do it only if node has not yet been visited nor already marked for visit (in the visit queue).
+        visit_queue << reference unless visit_queue.include?(reference) || visited.has_key?(reference)
+      end
+
+      index += 1
+    end
+
+    visited
   end
 
   def inspect
@@ -194,38 +235,14 @@ class Cell
   end
 end
 
-# def run!
-#   s = Spreadsheet.new
-#
-#   a1 = s.set(:A1, 1)
-#   a2 = s.set(:A2, 2)
-#   a3 = s.set(:A3)
-#   a4 = s.set(:A4, '=A1+A2+A3')
-#   a5 = s.set(:A5, '=A4*2')
-#   # a1.content = '=A5'
-#
-#   puts 'Initial spreadsheet:'
-#   p s
-#   p [a1, a2, a3, a4, a5].map { |cell| [cell.content, cell.eval] }
-#
-#   puts 'Setting A1 to 10:'
-#   a1.content = 10
-#   p [a1, a2, a3, a4, a5].map { |cell| [cell.content, cell.eval] }
-#
-#   puts 'Setting A2 to 20:'
-#   a2.content = 20
-#   p [a1, a2, a3, a4, a5].map { |cell| [cell.content, cell.eval] }
-#
-#   puts 'Setting A3 to 30:'
-#   a3.content = 30
-#   p [a1, a2, a3, a4, a5].map { |cell| [cell.content, cell.eval] }
-#
-#   puts 'Setting A4 to "=1+1":'
-#   a4.content = '=1+1'
-#   p [a1, a2, a3, a4, a5].map { |cell| [cell.content, cell.eval] }
-#
-#   puts 'Final spreadsheet:'
-#   p s
-# end
-#
-# run! if __FILE__ == $0
+def run!
+  s = Spreadsheet.new
+
+  a1 = s.set(:A1, 1)
+
+  (2..100).each do |i|
+    s.set :"A#{i}", "=A#{i-1}+1"
+  end
+end
+
+run! if __FILE__ == $0
