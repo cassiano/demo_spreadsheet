@@ -1,5 +1,4 @@
-# require 'pp'
-
+require_relative 'my_enum_for'
 require 'set'
 
 class Object
@@ -113,6 +112,41 @@ class Cell
     @evaluated_content || DEFAULT_VALUE
   end
 
+  def references_visitor(breadth_first = true)    # Pass false for a "depth first" traversal.
+    return my_enum_for(:references_visitor, breadth_first) unless block_given?
+
+    index    = 0
+    visited  = {}
+    to_visit = []
+
+    # Start scheduling a visit for the node pointed to by 'self'.
+    to_visit << self
+
+    # Are there still nodes to be visited?
+    while to_visit.any? do
+      current = breadth_first ? to_visit.shift : to_visit.pop
+
+      # p "Visiting #{current.addr}"
+
+      # Visit the node and save the result.
+      visited[current] = yield(current, index)
+
+      references = breadth_first ? current.references.to_a : current.references.to_a.reverse
+
+      # p "References: #{references.map(&:addr)}"
+
+      # Schedule a visit for each of the current node's references.
+      references.each do |reference|
+        # But do it only if node has not yet been visited nor already marked for visit (in the visit queue).
+        to_visit << reference unless to_visit.include?(reference) || visited.has_key?(reference)
+      end
+
+      index += 1
+    end
+
+    visited
+  end
+
   protected
 
   def is_formula?
@@ -201,38 +235,9 @@ class Cell
     false
   end
 
-  def references_visitor
-    return enum_for(:references_visitor) unless block_given?
-
-    index       = 0
-    visited     = {}
-    visit_queue = []
-
-    # Start scheduling a visit for the node pointed to by 'self'.
-    visit_queue << self
-
-    # Repeat while there are still nodes to be visited.
-    while !visit_queue.empty? do
-      current = visit_queue.shift     # Retrieve the oldest key.
-
-      # Visit the node and save the result.
-      visited[current] = yield(current, index)
-
-      # Schedule a visit for each of the current node's references.
-      current.references.each do |reference|
-        # But do it only if node has not yet been visited nor already marked for visit (in the visit queue).
-        visit_queue << reference unless visit_queue.include?(reference) || visited.has_key?(reference)
-      end
-
-      index += 1
-    end
-
-    visited
-  end
-
-  def inspect
-    [addr, content, { references: references.map(&:addr) }, { observers: observers.map(&:addr) }]
-  end
+  # def inspect
+  #   [addr, content, { references: references.map(&:addr) }, { observers: observers.map(&:addr) }]
+  # end
 end
 
 def run!
