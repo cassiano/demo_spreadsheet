@@ -88,20 +88,20 @@ describe Spreadsheet do
       a3 = @spreadsheet.get(:A3)
       a4 = @spreadsheet.get(:A4)
 
-      a5.references.must_equal Set.new([a2, a4])
+      a5.references.must_equal [a2, a4].to_set
       a5.observers.must_be_empty
 
       a1.references.must_be_empty
       a1.observers.must_be_empty
 
       a2.references.must_be_empty
-      a2.observers.must_equal Set.new([a5])
+      a2.observers.must_equal [a5].to_set
 
       a3.references.must_be_empty
       a3.observers.must_be_empty
 
       a4.references.must_be_empty
-      a2.observers.must_equal Set.new([a5])
+      a2.observers.must_equal [a5].to_set
     end
   end
 
